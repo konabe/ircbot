@@ -5,13 +5,8 @@ require 'cinch'
 
 $rooms = {}
 
-# 開発用のときは公開しない
 channel_list = ["#SHOBOT"]
 server = "irc.friend-chat.jp"
-if ARGV.size == 1 and ARGV[0] == "p"
-  channel_list = ["#AOCHD", "SHOBOT"]
-  server = "aochd.jp"
-end
 
 BOT_EMOJI = 0x1F320.chr("UTF-8")  # shooting star
 
