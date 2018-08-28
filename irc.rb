@@ -18,6 +18,20 @@ def bot_reply(m, str)
   m.reply("#{BOT_EMOJI} #{str}")
 end
 
+# 指定したユーザーがいる部屋のホスト名のリストを返却
+# いなければ空
+def find_rooms(t_user)
+  hosts = []
+  $rooms.each do |key, value|
+    flag = false
+    $rooms[key][:users].each do |user|
+      flag = true if user == t_user
+    end
+    hosts << key if flag
+  end
+  return hosts
+end
+
 bot = Cinch::Bot.new do
   configure do |c|
     c.server = "aochd.jp"
@@ -27,10 +41,12 @@ bot = Cinch::Bot.new do
     c.user = "shobot"
   end
 
+  # 応答テスト
   on :message, /@sho ping/ do |m|
     bot_reply "pong"
   end
 
+  # ヘルプ
   on :message, /@sho help/ do |m|
     str = "基本操作は @sho command (以下、コマンドリスト), "
     str += "create [roomname]: 部屋の作成, list: 部屋の一覧表示, "
@@ -40,76 +56,85 @@ bot = Cinch::Bot.new do
     bot_reply m, str
   end
 
+  # 部屋の作成
   on :message, /@sho create/ do |m|
-    #TODO 他の部屋に入っている場合は弾く
-    name = m.message.match(/@sho create (.*)/)
-    if name.nil?
+    nick = m.user.nick
+    if $rooms.key?(nick) or find_rooms(nick).empty?
+      bot_reply m, "すでにいずれかの部屋に参加しています"
+      return
+    end
+    roomname = m.message.match(/@sho create (.*)/)
+    if roomname.nil?
       bot_reply m, "command error -> @sho create [roomname]"
     else
-      nick = m.user.nick
-      room = {name: name[1], users: []}
+      room = {name: roomname[1], users: []}
       $rooms[nick] = room
-      bot_reply m, "ホスト\"#{nick}\"が部屋\"#{name[1]}\"を立てました"
+      bot_reply m, "ホスト#{nick}が部屋[#{name[1]}]を立てました"
     end
   end
 
+  # 部屋の一覧表示
   on :message, /@sho list/ do |m|
     if $rooms.empty?
       bot_reply m, "現在部屋はありません"
-      return
-    end
-    $rooms.each do |key, value|
-      bot_reply m, "#{value[:name]}[#{key}] 現在の人数[#{value[:users].length+1}]"
-    end
-  end
-
-  on :message, /@sho delete/ do |m|
-    nick = m.user.nick
-    m.reply $rooms[nick]
-    if $rooms.key?(nick)
-      target_name = $rooms[nick][:name]
-      $rooms.delete(nick)
-      bot_reply m, "ホスト#{nick}が部屋[#{target_name}]を解散しました"
     else
-      bot_reply m, "error -> you don't have any room yet."
+      $rooms.each do |key, value|
+        bot_reply m, "#{value[:name]}[#{key}] 現在の人数[#{value[:users].length+1}]"
+      end
+    end
+  end
+
+  # 部屋の削除
+  on :message, /@sho delete/ do |m|
+    if $rooms.key?(nick)
+      nick = m.user.nick
+      roomname = $rooms[nick][:name]
+      $rooms.delete(nick)
+      bot_reply m, "ホスト#{nick}が部屋[]#{roomname}]を解散しました"
+    else
+      bot_reply m, "error -> 解散する部屋はありません"
       return
     end
   end
 
+  # 部屋の強制削除
   on :message, /@sho force-delete/ do |m|
-    name = m.message.match(/@sho force-delete (\w.*)/)
-    if name.nil?
+    hostname = m.message.match(/@sho force-delete (\w.*)/)
+    if hostname.nil?
       bot_reply m, "command error -> @sho force-delete [*hostname]"
+    else
+      nick = m.user.nick
+      targetname = $rooms[hostname[1]][:name]
+      $rooms.delete(hostname[1])
+      bot_reply m, "ユーザー#{nick}がホスト#{hostname[1]}の部屋[#{targetname}]を強制削除しました"
+    end
+  end
+
+  # 部屋の参加
+  on :message, /@sho join/ do |m|
+    nick = m.user.nick
+    if $rooms.key?(nick) or not find_rooms(nick).empty?
+      bot_reply m, "すでにいずれかの部屋に参加しています"
       return
     end
-    nick = m.user.nick
-    name = name[1]
-    target_name = $rooms[name][:name]
-    $rooms.delete(name)
-    bot_reply m, "ユーザー#{nick}がホスト#{name}の部屋[#{target_name}]を強制削除しました"
-  end
-
-  on :message, /@sho join/ do |m|
-    name = m.message.match(/@sho join (\w.*)/)
-    $rooms[name[1]][:users] << m.user.nick
-    bot_reply m, "ユーザー#{m.user.nick}がホスト#{name[1]}の部屋に入りました"
-  end
-
-  on :message, /@sho exit/ do |m|
-    exit_hosts = []
-    $rooms.each do |key, value|
-      flag = false
-      $rooms[key][:users].each do |user|
-        if user == m.user.nick
-          flag = true
-        end
-      end
-      if flag
-        $rooms[key][:users].delete(m.user.nick)
-        exit_hosts << key
-      end
+    hostname = m.message.match(/@sho join (\w.*)/)
+    if $rooms.key?(hostname[1])
+      $rooms[hostname[1]][:users] << m.user.nick
+      bot_reply m, "ユーザー#{nick}が部屋[#{$rooms[hostname[1][:name]]}]に入りました"
+    else
+      bot_reply m, "そのようなホストが立てている部屋は存在しません"
     end
-    str = "ユーザー#{m.user.nick}がホスト"
+  end
+
+  # 部屋の退場
+  on :message, /@sho exit/ do |m|
+    nick = m.user.nick
+    exit_hosts = find_rooms(nick)
+    if exit_hosts.empty?
+      bot_reply m, "どの部屋にも参加していません"
+      return
+    end
+    str = "ユーザー#{nick}がホスト"
     exit_hosts.each do |host|
       str += host
       str += " "
@@ -118,27 +143,24 @@ bot = Cinch::Bot.new do
     bot_reply m, str
   end
 
+  # 現在の状況を表示
   on :message, /@sho status/ do |m|
-    if $rooms.key?(m.user.nick)
-      str = "#{$rooms[m.user.nick][:name]}[#{m.user.nick}] "
-      $rooms[m.user.nick][:users].each do |user|
+    nick = m.user.nick
+    # ホストの場合
+    if $rooms.key?(nick)
+      str = "#{nick}がホストの部屋[#{$rooms[nick][:name]}]の参加者は"
+      $rooms[nick][:users].each do |user|
         str += user
         str += " "
       end
+    # 参加者の場合
     else
-      roomnames = []
-      str = "ユーザー#{m.user.nick}は"
-      $rooms.each do |key, value|
-        flag = false
-        $rooms[key][:users].each do |user|
-          if user == m.user.nick
-            flag = true
-          end
-        end
-        if flag
-          roomnames << $rooms[key][:name]
-        end
-      end
+      str = "ユーザー#{nick}は"
+      roomnames = find_rooms(nick)
+      if roomnames.empty?
+        str += "どこにも所属していません"
+        bot_reply m, str
+        return
       roomnames.each do |host|
         str += host
         str += " "
@@ -147,7 +169,6 @@ bot = Cinch::Bot.new do
     end
     bot_reply m, str
   end
-
 end
 
 bot.start
