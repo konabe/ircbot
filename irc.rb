@@ -161,6 +161,7 @@ bot = Cinch::Bot.new do
         str += "どこにも所属していません"
         bot_reply m, str
         return
+      end
       roomnames.each do |host|
         str += host
         str += " "
