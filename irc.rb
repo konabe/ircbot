@@ -59,7 +59,7 @@ bot = Cinch::Bot.new do
   # 部屋の作成
   on :message, /@sho create/ do |m|
     nick = m.user.nick
-    if $rooms.key?(nick) or find_rooms(nick).empty?
+    if $rooms.key?(nick) or not find_rooms(nick).empty?
       bot_reply m, "すでにいずれかの部屋に参加しています"
       return
     end
@@ -69,7 +69,7 @@ bot = Cinch::Bot.new do
     else
       room = {name: roomname[1], users: []}
       $rooms[nick] = room
-      bot_reply m, "ホスト#{nick}が部屋[#{name[1]}]を立てました"
+      bot_reply m, "ホスト#{nick}が部屋[#{roomname[1]}]を立てました"
     end
   end
 
@@ -79,7 +79,7 @@ bot = Cinch::Bot.new do
       bot_reply m, "現在部屋はありません"
     else
       $rooms.each do |key, value|
-        bot_reply m, "#{value[:name]}[#{key}] 現在の人数[#{value[:users].length+1}]"
+        bot_reply m, "#{key}[#{value[:name]}] 人数=#{value[:users].length+1}"
       end
     end
   end
@@ -118,9 +118,13 @@ bot = Cinch::Bot.new do
       return
     end
     hostname = m.message.match(/@sho join (\w.*)/)
+    if hostname.nil?
+      bot_reply m, "command error -> @sho join [*hostname]"
+      return
+    end
     if $rooms.key?(hostname[1])
       $rooms[hostname[1]][:users] << m.user.nick
-      bot_reply m, "ユーザー#{nick}が部屋[#{$rooms[hostname[1][:name]]}]に入りました"
+      bot_reply m, "ユーザー#{nick}が部屋[#{$rooms[hostname[1]][:name]}]に入りました"
     else
       bot_reply m, "そのようなホストが立てている部屋は存在しません"
     end
@@ -134,10 +138,11 @@ bot = Cinch::Bot.new do
       bot_reply m, "どの部屋にも参加していません"
       return
     end
-    str = "ユーザー#{nick}がホスト"
+    str = "ユーザー#{nick}が"
     exit_hosts.each do |host|
-      str += host
-      str += " "
+      str += "["
+      str += $rooms[host][:name]
+      str += "]"
     end
     str += "の部屋を退場しました"
     bot_reply m, str
@@ -149,6 +154,11 @@ bot = Cinch::Bot.new do
     # ホストの場合
     if $rooms.key?(nick)
       str = "#{nick}がホストの部屋[#{$rooms[nick][:name]}]の参加者は"
+      if $rooms[nick][:users].empty?
+        str += "いません"
+        bot_reply m, str
+        return
+      end
       $rooms[nick][:users].each do |user|
         str += user
         str += " "
@@ -161,8 +171,9 @@ bot = Cinch::Bot.new do
         str += "どこにも所属していません"
         bot_reply m, str
         return
+      end
       roomnames.each do |host|
-        str += host
+        str += $rooms[host][:name]
         str += " "
       end
       str += "に入っています"
