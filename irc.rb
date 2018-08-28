@@ -23,11 +23,12 @@ bot = Cinch::Bot.new do
   end
 
   on :message, /@sho help/ do |m|
-    bot_reply m, "基本操作は @sho command (以下command)"
-    bot_reply m, "create [name]: 部屋の作成, list: 部屋の一覧表示"
-    bot_reply m, "status: 現在の状況を表示"
-    bot_reply m, "join [hostname]: 部屋の入場, exit: 部屋の退場"
-    bot_reply m, "delete: 部屋の削除, force-delete [hostname]: 部屋の強制削除"
+    str = "基本操作は @sho command (以下、コマンドリスト), "
+    str += "create [roomname]: 部屋の作成, list: 部屋の一覧表示, "
+    str += "status: ユーザーの現在の状況を表示, "
+    str += "join [hostname]: 部屋の入場, exit: 部屋の退場, "
+    str += "delete: 部屋の削除, force-delete [hostname]: 部屋の強制削除"
+    bot_reply m, str
   end
 
   on :message, /@sho create/ do |m|
