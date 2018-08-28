@@ -6,9 +6,11 @@ require 'cinch'
 $rooms = {}
 
 # 開発用のときは公開しない
-channel_list = ["#SHOBOT", "#AOCHD"]
-if ARGV.size == 1 and ARGV[0] == "d"
-  channel_list = ["#SHOBOT"]
+channel_list = ["#SHOBOT"]
+server = "irc.friend-chat.jp"
+if ARGV.size == 1 and ARGV[0] == "p"
+  channel_list = ["#AOCHD", "SHOBOT"]
+  server = "aochd.jp"
 end
 
 BOT_EMOJI = 0x1F320.chr("UTF-8")  # shooting star
@@ -34,7 +36,7 @@ end
 
 bot = Cinch::Bot.new do
   configure do |c|
-    c.server = "aochd.jp"
+    c.server = server
     c.channels = channel_list
     c.nick = "shobot"
     c.realname = "shobot"
@@ -69,7 +71,7 @@ bot = Cinch::Bot.new do
     else
       room = {name: roomname[1], users: []}
       $rooms[nick] = room
-      bot_reply m, "ホスト#{nick}が部屋[#{roomname[1]}]を立てました"
+      bot_reply m, "ホスト #{nick} が部屋[#{roomname[1]}]を立てました"
     end
   end
 
@@ -86,11 +88,11 @@ bot = Cinch::Bot.new do
 
   # 部屋の削除
   on :message, /@sho delete/ do |m|
+    nick = m.user.nick
     if $rooms.key?(nick)
-      nick = m.user.nick
       roomname = $rooms[nick][:name]
       $rooms.delete(nick)
-      bot_reply m, "ホスト#{nick}が部屋[]#{roomname}]を解散しました"
+      bot_reply m, "ホスト #{nick} が部屋[#{roomname}]を解散しました"
     else
       bot_reply m, "error -> 解散する部屋はありません"
       return
@@ -106,7 +108,7 @@ bot = Cinch::Bot.new do
       nick = m.user.nick
       targetname = $rooms[hostname[1]][:name]
       $rooms.delete(hostname[1])
-      bot_reply m, "ユーザー#{nick}がホスト#{hostname[1]}の部屋[#{targetname}]を強制削除しました"
+      bot_reply m, "ユーザー #{nick} がホスト #{hostname[1]} の部屋[#{targetname}]を強制削除しました"
     end
   end
 
@@ -124,7 +126,7 @@ bot = Cinch::Bot.new do
     end
     if $rooms.key?(hostname[1])
       $rooms[hostname[1]][:users] << m.user.nick
-      bot_reply m, "ユーザー#{nick}が部屋[#{$rooms[hostname[1]][:name]}]に入りました"
+      bot_reply m, "ユーザー #{nick} が部屋[#{$rooms[hostname[1]][:name]}]に入りました"
     else
       bot_reply m, "そのようなホストが立てている部屋は存在しません"
     end
@@ -138,13 +140,13 @@ bot = Cinch::Bot.new do
       bot_reply m, "どの部屋にも参加していません"
       return
     end
-    str = "ユーザー#{nick}が"
+    str = "ユーザー #{nick} が部屋"
     exit_hosts.each do |host|
       str += "["
       str += $rooms[host][:name]
       str += "]"
     end
-    str += "の部屋を退場しました"
+    str += "を退場しました"
     bot_reply m, str
   end
 
@@ -153,7 +155,7 @@ bot = Cinch::Bot.new do
     nick = m.user.nick
     # ホストの場合
     if $rooms.key?(nick)
-      str = "#{nick}がホストの部屋[#{$rooms[nick][:name]}]の参加者は"
+      str = "#{nick} がホストの部屋[#{$rooms[nick][:name]}]の参加者は "
       if $rooms[nick][:users].empty?
         str += "いません"
         bot_reply m, str
@@ -165,7 +167,7 @@ bot = Cinch::Bot.new do
       end
     # 参加者の場合
     else
-      str = "ユーザー#{nick}は"
+      str = "ユーザー #{nick} は"
       roomnames = find_rooms(nick)
       if roomnames.empty?
         str += "どこにも所属していません"
