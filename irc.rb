@@ -5,6 +5,10 @@ require 'cinch'
 
 $rooms = {}
 
+def bot_reply(m, str)
+  m.reply("#{0x1F320.chr("UTF-8")} #{str}")
+end
+
 bot = Cinch::Bot.new do
   configure do |c|
     c.server = "aochd.jp"
@@ -15,29 +19,38 @@ bot = Cinch::Bot.new do
   end
 
   on :message, /@sho ping/ do |m|
-    m.reply "pong"
+    bot_reply "pong"
   end
 
   on :message, /@sho help/ do |m|
-    m.reply "create [name]: 部屋の作成, show: 部屋の一覧表示"
-    m.reply "delete: 部屋の削除, force-delete: 部屋の強制削除"
+    bot_reply m, "基本操作は @sho command (以下command)"
+    bot_reply m, "create [name]: 部屋の作成, list: 部屋の一覧表示"
+    bot_reply m, "status: 現在の状況を表示"
+    bot_reply m, "join [hostname]: 部屋の入場, exit: 部屋の退場"
+    bot_reply m, "delete: 部屋の削除, force-delete [hostname]: 部屋の強制削除"
   end
 
   on :message, /@sho create/ do |m|
     #TODO 他の部屋に入っている場合は弾く
-    name = m.message.match(/@sho create (\w.*)/)
+    name = m.message.match(/@sho create (.*)/)
     if name.nil?
-      m.reply "使用方法：@sho create [room name] (日本語未対応)"
-      return
+      bot_reply m, "command error -> @sho create [roomname]"
+    else
+      nick = m.user.nick
+      room = {name: name[1], users: []}
+      $rooms[nick] = room
+      bot_reply m, "ホスト\"#{nick}\"が部屋\"#{name[1]}\"を立てました"
     end
-    nick = m.user.nick
-    room = {name: name[1], users: [m.user.nick]}
-    $rooms[nick] = room
-    m.reply "ホスト#{nick}が部屋[#{name[1]}] を建てました！"
   end
     
-  on :message, /@sho show/ do |m|
-    m.reply $rooms
+  on :message, /@sho list/ do |m|
+    if $rooms.empty?
+      bot_reply m, "現在部屋はありません"
+      return
+    end
+    $rooms.each do |key, value|
+      bot_reply m, "#{value[:name]}[#{key}] 現在の人数[#{value[:users].length+1}]"
+    end
   end
 
   on :message, /@sho delete/ do |m|
@@ -46,9 +59,9 @@ bot = Cinch::Bot.new do
     if $rooms.key?(nick)
       target_name = $rooms[nick][:name]
       $rooms.delete(nick)
-      m.reply "ホスト #{nick}が部屋[#{target_name}]を消しました!"
+      bot_reply m, "ホスト#{nick}が部屋[#{target_name}]を解散しました"
     else
-      m.reply "まだ部屋を立てていないのでコマンドが有効ではありません"
+      bot_reply m, "error -> you don't have any room yet."
       return
     end
   end
@@ -56,14 +69,73 @@ bot = Cinch::Bot.new do
   on :message, /@sho force-delete/ do |m|
     name = m.message.match(/@sho force-delete (\w.*)/)
     if name.nil?
-      m.reply "使用方法：@sho force-delete [host name]"
+      bot_reply m, "command error -> @sho force-delete [*hostname]"
       return
     end
     nick = m.user.nick
     name = name[1]
     target_name = $rooms[name][:name]
     $rooms.delete(name)
-    m.reply "ユーザー#{nick}がホストが#{name}の部屋[#{target_name}]を消しました!"
+    bot_reply m, "ユーザー#{nick}がホスト#{name}の部屋[#{target_name}]を強制削除しました"
+  end
+
+  on :message, /@sho join/ do |m|
+    name = m.message.match(/@sho join (\w.*)/)
+    $rooms[name[1]][:users] << m.user.nick
+    bot_reply m, "ユーザー#{m.user.nick}がホスト#{name[1]}の部屋に入りました"
+  end
+
+  on :message, /@sho exit/ do |m|
+    exit_hosts = []
+    $rooms.each do |key, value|
+      flag = false
+      $rooms[key][:users].each do |user|
+        if user == m.user.nick
+          flag = true
+        end
+      end
+      if flag
+        $rooms[key][:users].delete(m.user.nick)
+        exit_hosts << key
+      end
+    end
+    str = "ユーザー#{m.user.nick}がホスト"
+    exit_hosts.each do |host|
+      str += host
+      str += " "
+    end
+    str += "の部屋を退場しました"
+    bot_reply m, str
+  end
+
+  on :message, /@sho status/ do |m|
+    if $rooms.key?(m.user.nick)
+      str = "#{$rooms[m.user.nick][:name]}[#{m.user.nick}] "
+      $rooms[m.user.nick][:users].each do |user|
+        str += user
+        str += " "
+      end
+    else
+      roomnames = []
+      str = "ユーザー#{m.user.nick}は"
+      $rooms.each do |key, value|
+        flag = false
+        $rooms[key][:users].each do |user|
+          if user == m.user.nick
+            flag = true
+          end
+        end
+        if flag
+          roomnames << $rooms[key][:name]
+        end
+      end
+      roomnames.each do |host|
+        str += host
+        str += " "
+      end
+      str += "に入っています"
+    end
+    bot_reply m, str
   end
 
 end
