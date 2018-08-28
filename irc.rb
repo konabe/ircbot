@@ -5,14 +5,23 @@ require 'cinch'
 
 $rooms = {}
 
+# 開発用のときは公開しない
+channel_list = ["#SHOBOT", "#AOCHD"]
+if ARGV.size == 1 and ARGV[0] == "d"
+  channel_list = ["#SHOBOT"]
+end
+
+BOT_EMOJI = 0x1F320.chr("UTF-8")  # shooting star
+
+# 返事をする
 def bot_reply(m, str)
-  m.reply("#{0x1F320.chr("UTF-8")} #{str}")
+  m.reply("#{BOT_EMOJI} #{str}")
 end
 
 bot = Cinch::Bot.new do
   configure do |c|
     c.server = "aochd.jp"
-    c.channels = ["#SHOBOT"]
+    c.channels = channel_list
     c.nick = "shobot"
     c.realname = "shobot"
     c.user = "shobot"
@@ -43,7 +52,7 @@ bot = Cinch::Bot.new do
       bot_reply m, "ホスト\"#{nick}\"が部屋\"#{name[1]}\"を立てました"
     end
   end
-    
+
   on :message, /@sho list/ do |m|
     if $rooms.empty?
       bot_reply m, "現在部屋はありません"
